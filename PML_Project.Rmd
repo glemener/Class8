@@ -137,3 +137,11 @@ second_model <- train(classe ~ ., data=sub_training, method="rf", trControl=trai
 second_prediction <- predict(second_model, newdata=sub_testing)
 confusionMatrix(second_prediction, sub_testing$classe)
 ```
+
+The second model performs very well. Accuracy is 0.9933 with a very good confidence interval (95% CI).
+
+# Submission
+```{r}
+final <- predict(second_model, newdata=testing)
+final
+```

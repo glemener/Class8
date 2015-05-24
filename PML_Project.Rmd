@@ -1,0 +1,139 @@
+---
+title: "Practical Machine Learning - Project"
+author: "Guillaume Le Mener"
+date: "May 24, 2015"
+output: html_document
+---
+
+# Executive Summary
+This document presents the selection of a machine learning algorithm choseen to perform the task of predicting the Classe of physical activities based on data that represents the measurements of acceleration at different location on the body. After an exploration of the data, the selection of the algorithm is made by looking at the overall accuracy and the cross-validation of on 2 models suitable for classification.
+
+# Configuration
+This section provides information for reproductible research. Don't forget to set the seed to the same value to reprodue the same results!
+
+```{r}
+version$platform
+version$version.string
+#install.packages("caret")
+#install.packages("randomForest")
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("rattle")
+#install.packages('e1071', dependencies=TRUE)
+#install.packages("doMC", dependencies = TRUE)
+require(caret)
+require(randomForest)
+require(rpart)
+require(rattle)
+require(rpart.plot)
+require(e1071)
+require(doMC)
+set.seed(1234)
+registerDoMC(cores=5)
+```
+
+# Exploration
+
+## Downloading and loading the 2 data sets
+
+```{r cache=TRUE}
+url_training <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url_testing <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(url=url_training, destfile="pml-training.csv", method="curl")
+download.file(url=url_testing, destfile="pml-testing.csv", method="curl")
+
+training = read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+testing = read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+
+```
+
+
+## Quick look at the data
+First, checking if we have any NA values in the data sets since Machine Learning algorithmes are quiet sensitive to NA values.
+
+
+```{r}
+sum(is.na(training))
+sum(is.na(testing))
+```
+
+Clearly, we do have NA values, let's remove them.
+
+```{r}
+
+training <-training[,colSums(is.na(training)) == 0]
+testing <-testing[,colSums(is.na(testing)) == 0]
+
+```
+
+Now, let's look at the dimension of the 2 data sets.
+```{r}
+dim(training); dim(testing)
+```
+
+
+```{r}
+str(training)
+```
+
+The first 7 variables are not relevant to this project, so we are going to remove them.
+
+```{r}
+training  <-training[,-c(1:7)]
+testing <-testing[,-c(1:7)]
+```
+
+Since we are going to predict the Classe variable, let's take a look at it from a distribution point of view.
+
+```{r}
+plot(training$classe, main="Distirbution of classes in the training set", xlab="Classe", ylab="Frequency", col="red")
+```
+
+Almost a uniform level of frequencies accross the Classe excpet for A. D is the less frequent.
+
+# Cross-Validation preparation (partioning)
+
+To perform cross-validation we need to subset the our training data set in two sets. One of 75% of the training data set for training, and the remaining 25% for cross-validation. We use a random sampling without replacement.
+
+```{r}
+sub <- createDataPartition(y=training$classe, p=0.75, list=FALSE)
+sub_training <- training[sub, ]
+sub_testing <- training[-sub, ]
+dim(sub_training); dim(sub_testing)
+```
+
+# First Model - Decision Tree
+
+Let's create first the Decision Tree model based on 'rpart' on the Class using all the variables avialable in the data set.
+
+```{r cache=TRUE}
+first_model <- train(classe ~ ., data=sub_training, method="rpart")
+```
+
+
+``` {r}
+first_prediction <- predict(first_model, newdata=sub_testing)
+```
+
+``` {r}
+fancyRpartPlot(first_model$finalModel)
+```
+
+It looks like the model is not able to predict any of the D value.
+
+
+``` {r}
+confusionMatrix(first_prediction, sub_testing$classe)
+```
+
+# Seconf Model - Random Forest
+
+``` {r cache=TRUE}
+second_model <- train(classe ~ ., data=sub_training, method="rf", trControl=trainControl(method="cv"),number=3)
+```
+
+```{r}
+second_prediction <- predict(second_model, newdata=sub_testing)
+confusionMatrix(second_prediction, sub_testing$classe)
+```
